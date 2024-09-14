@@ -16,9 +16,8 @@ st.set_page_config(
 st.title("👶 Baby Gender Simulation")
 
 # Define the slider options
-options_lambda = [0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 7, 10, 15, 20, 30, 50, 100, 300, 1000]
-options_days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 , 12, 14, 16, 18, 20,
-               25, 30, 35, 40, 50, 70, 100, 300, 1000]
+options_lambda = [0.25, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 7, 10, 15, 20, 30, 50, 100]
+options_days = [1, 2, 4, 6, 10, 15, 20, 40, 70, 100, 300, 1000, 10000]
 
 # Create four columns: three for sliders and one for the button
 slider_col1, slider_col2, slider_col3, button_col = st.columns(4)
@@ -44,7 +43,7 @@ with slider_col3:
     n_days = st.select_slider(
         "Number of Days Observed",
         options=options_days,
-        value=10
+        value=300
     )
 
 with button_col:
@@ -163,7 +162,7 @@ with plot_col2:
     counts = [gender_ratio_counts.get(label, 0) for label in labels]
     positions = np.arange(len(labels))
     bars = ax2.bar(positions, counts, color='purple')
-    ax2.set_xlabel('Percentage of Male Babies')
+    ax2.set_xlabel('Percentage of Babies that Day are Male')
     ax2.set_ylabel('Number of Days')
     ax2.set_title('Distribution of daily Male-Female Percentages')
     ax2.set_xticks(positions)
@@ -190,21 +189,9 @@ st.subheader("📊 Simulation Results")
 cols = st.columns(2)
 
 with cols[0]:
-    st.metric("Total Days Observed", n_days)
     st.metric("Total Boys Born", int(total_boys))
+    
 
 with cols[1]:
     st.metric("Total Girls Born", int(total_girls))
-    # Calculate and display the overall boy-to-girl ratio
-    if total_girls > 0:
-        # Convert to a fraction and limit the denominator to a reasonable size
-        ratio_fraction = Fraction(total_boys, total_girls).limit_denominator()
-        st.metric("Boys-to-Girls Ratio", f"{ratio_fraction.numerator}:{ratio_fraction.denominator}")
-    elif total_boys > 0:
-        st.metric("Boys-to-Girls Ratio", "∞:1")
-    else:
-        st.metric("Boys-to-Girls Ratio", "Undefined")
-
-# # Re-run the simulation when the button is pressed
-# if rerun_simulation:
-#     st.experimental_rerun()
+    
