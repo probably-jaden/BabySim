@@ -1,8 +1,10 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.stats import poisson
 from fractions import Fraction
+
 
 # Set the page configuration (optional)
 st.set_page_config(
@@ -18,8 +20,8 @@ options_lambda = [0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 7, 10, 15, 20, 30, 50, 100, 300
 options_days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 , 12, 14, 16, 18, 20,
                25, 30, 35, 40, 50, 70, 100, 300, 1000]
 
-# Create three columns for sliders
-slider_col1, slider_col2, slider_col3 = st.columns(3)
+# Create four columns: three for sliders and one for the button
+slider_col1, slider_col2, slider_col3, button_col = st.columns(4)
 
 with slider_col1:
     lambda_ = st.select_slider(
@@ -45,34 +47,37 @@ with slider_col3:
         value=10
     )
 
-# Add a "Run Simulation" button
-run_simulation = st.button("🔄 Run Simulation")
+with button_col:
+    # Place the "Run Simulation" button in the fourth column
+    rerun_simulation = st.button("🔄 Rerun Simulation")
+
+st.markdown("---")
 
 # Define bins and labels for gender ratio distribution at the global scope
-bins = [0, 20, 40, 60, 80, 100]  # Include -0.1 to capture 0% correctly
-labels = ['0%', '20%', '40%', '60%', '80%', '100%']
+bins = [-0.1, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]  # Include -0.1 to capture 0% correctly
+labels = ['0', '.1', '.2', '.3', '.4', '.5', '.6', '.7', '.8', '.9', '1']
 
 # Function to perform the simulation
 def run_baby_gender_simulation(lambda_, p, n_days):
     # Simulate number of babies born each day using Poisson distribution
     n_babies_per_day = np.random.poisson(lambda_, n_days)
     
-    # Simulate genders for each baby born each day
+    
     percent_males_per_day = []
     total_boys = 0
     total_girls = 0
-    
+
     for n_babies in n_babies_per_day:
-        if n_babies > 0:
-            genders = np.random.binomial(1, p, n_babies)  # 1: Boy, 0: Girl
-            num_boys = np.sum(genders)
-            num_girls = n_babies - num_boys
-            percent_males = (num_boys / n_babies) * 100
-            percent_males_per_day.append(percent_males)
-            total_boys += num_boys
-            total_girls += num_girls
-        else:
-            percent_males_per_day.append(np.nan)  # No babies born on this day
+        if n_babies == 0:
+            continue  # Skip days with no babies
+        # Process days with babies
+        genders = np.random.binomial(1, p, n_babies)  # 1: Boy, 0: Girl
+        num_boys = np.sum(genders)
+        num_girls = n_babies - num_boys
+        percent_males = (num_boys / n_babies) * 100
+        percent_males_per_day.append(percent_males)
+        total_boys += num_boys
+        total_girls += num_girls
     
     # Convert list to NumPy array for processing
     percent_males_array = np.array(percent_males_per_day)
@@ -84,10 +89,9 @@ def run_baby_gender_simulation(lambda_, p, n_days):
     bin_indices = np.digitize(valid_percentages, bins)
     
     # Count the number of days in each bin
-    gender_ratio_counts = {label: 0 for label in labels}
-    for idx, label in enumerate(labels):
-        count = np.sum(bin_indices == idx + 1)
-        gender_ratio_counts[label] = count
+    df = pd.DataFrame({'percent_males': percent_males_per_day})
+    df['bins'] = pd.cut(df['percent_males'], bins=bins, labels=labels, include_lowest=True)
+    gender_ratio_counts = df['bins'].value_counts().sort_index().to_dict()
     
     # Prepare data for the Poisson distribution plot
     if len(n_babies_per_day) > 0:
@@ -124,6 +128,7 @@ x_values = simulation_results['x_values']
 simulation_counts = simulation_results['simulation_counts']
 theoretical_counts = simulation_results['theoretical_counts']
 
+
 # Create two columns for the plots
 plot_col1, plot_col2 = st.columns(2)
 
@@ -135,8 +140,15 @@ with plot_col1:
     ax1.bar(x_values + width/2, theoretical_counts, width=width, label='Theoretical', color='orange')
     ax1.set_xlabel('Number of Babies Born')
     ax1.set_ylabel('Number of Days')
-    ax1.set_title('# of Days with X Number of Babies Born')
+    ax1.set_title('Distribution of Birth Counts per Day')
     ax1.legend()
+    
+    # Set x-axis ticks to show only integer values
+    ax1.set_xticks(x_values)
+    ax1.set_xticklabels(x_values)
+    
+    # Optional: Adjust x-axis limits
+    ax1.set_xlim([x_values.min() - 1, x_values.max() + 1])
     
     # Remove grid lines
     ax1.grid(False)
@@ -146,34 +158,32 @@ with plot_col1:
     
     st.pyplot(fig1)
 
-# Plot the Distribution of Gender Ratios
 with plot_col2:
     fig2, ax2 = plt.subplots(figsize=(6, 4))
-    # Use the labels defined globally
-    ratio_labels = labels  # ['0%', '20%', '40%', '60%', '80%', '100%']
-    counts = [gender_ratio_counts[label] for label in labels]
-    bars = ax2.bar(ratio_labels, counts, color='purple')
+    counts = [gender_ratio_counts.get(label, 0) for label in labels]
+    positions = np.arange(len(labels))
+    bars = ax2.bar(positions, counts, color='purple')
     ax2.set_xlabel('Percentage of Male Babies')
     ax2.set_ylabel('Number of Days')
-    ax2.set_title('# Days that had certain % of males')
-    
-    # Remove grid lines
+    ax2.set_title('Distribution of daily Male-Female Percentages')
+    ax2.set_xticks(positions)
+    ax2.set_xticklabels(labels, rotation=45)
+
+    # Remove grid lines and spines
     ax2.grid(False)
-    # Remove black framing around the plot
     for spine in ax2.spines.values():
         spine.set_visible(False)
-    
-    # Add annotations to each bar
+
+    # Add annotations
     for bar in bars:
         height = bar.get_height()
         ax2.annotate(f'{int(height)}',
-                    xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom')
-    
-    st.pyplot(fig2)
+                     xy=(bar.get_x() + bar.get_width() / 2, height),
+                     xytext=(0, 3),
+                     textcoords="offset points",
+                     ha='center', va='bottom')
 
+    st.pyplot(fig2)
 # Display Simulation Results
 st.markdown("---")
 st.subheader("📊 Simulation Results")
@@ -195,6 +205,6 @@ with cols[1]:
     else:
         st.metric("Boys-to-Girls Ratio", "Undefined")
 
-# Re-run the simulation when the button is pressed
-if run_simulation:
-    st.experimental_rerun()
+# # Re-run the simulation when the button is pressed
+# if rerun_simulation:
+#     st.experimental_rerun()
